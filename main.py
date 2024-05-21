@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 class Field:
     pass
@@ -16,7 +16,7 @@ class Phone(Field):
 class Birthday(Field):
     def __init__(self, value):
         try:
-            self.value = datetime.strptime(value, "%d.%m.%Y")
+            self.value = datetime.strptime(value, "%d.%m.%Y").date()
         except ValueError:
             raise ValueError("Invalid date format. Use DD.MM.YYYY")
 
@@ -97,11 +97,8 @@ def show_all_contacts(book: AddressBook):
     if book.contacts:
         contact_info = []
         for contact in book.contacts:
-            if contact.phones:
-                phones = ', '.join([phone.value for phone in contact.phones])
-                contact_info.append(f"{contact.name.value}: {phones}")
-            else:
-                contact_info.append(contact.name.value)
+            phones = ', '.join([phone.value for phone in contact.phones])
+            contact_info.append(f"{contact.name.value}: {phones}")
         return "\n".join(contact_info)
     else:
         return "Address book is empty."
@@ -127,16 +124,57 @@ def show_birthday(args, book: AddressBook):
     else:
         return f"Contact {name} not found."
 
+def string_to_date(date_string):
+    return datetime.strptime(date_string, "%d.%m.%Y").date()
+
+def date_to_string(date):
+    return date.strftime("%d.%m.%Y")
+
+def prepare_user_list(user_data):
+    prepared_list = []
+    for user in user_data:
+        prepared_list.append({"name": user["name"], "birthday": user["birthday"]})
+    return prepared_list
+
+def find_next_weekday(start_date, weekday):
+    days_ahead = weekday - start_date.weekday()
+    if days_ahead <= 0:
+        days_ahead += 7
+    return start_date + timedelta(days=days_ahead)
+
+def adjust_for_weekend(birthday):
+    if birthday.weekday() >= 5:
+        return find_next_weekday(birthday, 0)
+    return birthday
+
+def get_upcoming_birthdays(users, days=7):
+    upcoming_birthdays = []
+    today = date.today()
+
+    for user in users:
+        birthday_this_year = user["birthday"].replace(year=today.year)
+
+
+        if birthday_this_year < today:
+            birthday_this_year = user["birthday"].replace(year=today.year + 1)
+
+
+        birthday_this_year = adjust_for_weekend(birthday_this_year)
+
+
+        if today <= birthday_this_year <= today + timedelta(days=days):
+            congratulation_date_str = date_to_string(birthday_this_year)
+            upcoming_birthdays.append({"name": user["name"], "congratulation_date": congratulation_date_str})
+    return upcoming_birthdays
+
 @input_error
 def birthdays(book: AddressBook):
-    all_birthdays = []
-    for contact in book.contacts:
-        if contact.birthday:
-            all_birthdays.append(f"{contact.name.value}: {contact.birthday.value.strftime('%d.%m.%Y')}")
-    if all_birthdays:
-        return "\n".join(all_birthdays)
+    all_contacts = prepare_user_list([{"name": contact.name.value, "birthday": contact.birthday.value} for contact in book.contacts if contact.birthday])
+    upcoming_birthdays = get_upcoming_birthdays(all_contacts)
+    if upcoming_birthdays:
+        return "\n".join([f"{user['name']}'s birthday is on {user['congratulation_date']}" for user in upcoming_birthdays])
     else:
-        return "No birthdays found."
+        return "No upcoming birthdays within the next week."
 
 def hello():
     return "Hello! How can I help you?"
@@ -194,4 +232,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
